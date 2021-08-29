@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 
-function Square(props: any) {
+function Square(props: {value:number}) {
   return (
     <div className="square">
       {props.value}
@@ -10,22 +10,26 @@ function Square(props: any) {
   );
 }
 
-class Board extends React.Component<{size: number}, {size:number, squares: Array<number>}> {
-  constructor(props: any) {
-    super(props)
+class Board extends React.Component<{size: number}, {size:number, squares: Array<{value:number}>}> {
+  constructor(props: {size: number}) {
+    super(props);
 
     this.state = {
       size: props.size,
-      squares: Array(props.size*props.size).fill(0)
-    }
+      squares: Array(props.size*props.size).fill({value: 0})
+    };
 
-    this.setState({size: props.size}, this.makeMagic) // ensure it only attempts to create the magic square after state goes through
+  }
+
+  // sets up the square after mounting
+  componentDidMount() {
+    this.makeMagic();
   }
 
   UNSAFE_componentWillReceiveProps(nextProps: any) {
     this.setState({
       size: nextProps.size,
-      squares: Array(nextProps.size*nextProps.size).fill(0)
+      squares: Array(nextProps.size*nextProps.size).fill({value: 0})
     }, this.makeMagic);
   }
 
@@ -38,107 +42,219 @@ class Board extends React.Component<{size: number}, {size:number, squares: Array
     }
   }
 
-  makeMagic() {
-    // compute magic squares array
+  durerSquares(curNum:number, arr:{value:number}[]) {
+    let i     = 0 // row
+    let j     = 0 // col
+    //const N   = Math.pow(this.state.size / 4, 2); // number of 4x4 squares
+    const G   = this.state.size / 4; // number of segments of an individual row or column
+    const SEG = this.state.size / G; // the length of each segment
+    for (let _i = 0; _i < this.state.size; _i++) {
+      for (let _j = 0; _j < this.state.size; _j++) {
+        let index = j + this.state.size*i
 
-    var curNum: number = 1
-    var arr            = Array(this.state.size*this.state.size).fill(0)
+        let i_norm = this.durerNormToSeg(i, SEG);
+        let j_norm = this.durerNormToSeg(j, SEG);
 
-    // eslint-disable-next-line
-    if ((this.state.size % 2 == 0) && (this.state.size % 4 == 0)) { // doubly even
-      // Durer method
-      let i     = 0 // row
-      let j     = 0 // col
-      const N   = Math.pow(this.state.size / 4, 2); // number of 4x4 squares
-      const G   = this.state.size / 4; // number of segments of an individual row or column
-      const SEG = this.state.size / G; // the length of each segment
-      for (let _i = 0; _i < this.state.size; _i++) {
-        for (let _j = 0; _j < this.state.size; _j++) {
-          let index = j + this.state.size*i
-
-          let i_norm = this.durerNormToSeg(i, SEG);
-          let j_norm = this.durerNormToSeg(j, SEG);
-
-          //console.log(curNum + ": " + i_norm)
-
-          if (i_norm == 0 || i_norm == 3) { // outer
-            if (j_norm == 0 || j_norm == 3) {
-              arr[index] = curNum;
-            }
-          } else { // inner
-            if (j_norm == 1 || j_norm == 2) {
-              arr[index] = curNum;
-            }
+        if (i_norm === 0 || i_norm === 3) { // outer
+          if (j_norm === 0 || j_norm === 3) {
+            arr[index].value = curNum;
           }
-
-          curNum++;
-          j += 1;
+        } else { // inner
+          if (j_norm === 1 || j_norm === 2) {
+            arr[index].value = curNum;
+          }
         }
-        j  = 0;
-        i += 1;
+
+        curNum++;
+        j += 1;
       }
-      // fill in the remaining places moving backwards
-      curNum = 1;
-      j = this.state.size-1;
-      i = this.state.size-1;
-      for (let _i = 0; _i < this.state.size; _i++) {
-        for (let _j = 0; _j < this.state.size; _j++) {
-          let index = j + this.state.size*i
+      j  = 0;
+      i += 1;
+    }
+    // fill in the remaining places moving backwards
+    curNum = 1;
+    j = this.state.size-1;
+    i = this.state.size-1;
+    for (let _i = 0; _i < this.state.size; _i++) {
+      for (let _j = 0; _j < this.state.size; _j++) {
+        let index = j + this.state.size*i
 
-          if (arr[index] == 0) {
-            arr[index] = curNum;
-          }
-
-          curNum++;
-          j -= 1;
+        if (arr[index].value === 0) {
+          arr[index].value = curNum;
         }
-        j  = this.state.size-1;
-        i -= 1;
+
+        curNum++;
+        j -= 1;
+      }
+      j  = this.state.size-1;
+      i -= 1;
+    }
+  }
+
+  gammaPlusTwoSquares(curNum:number, arr:{value:number}[], size:number) {
+    // start one right of the centre
+    var i = Math.floor(size /2) // row
+    var j = Math.floor(size /2) + 1// col
+    for (let num = 0; num < size; num++) {
+      for (let m = 0; m < size; m++) {
+        let index = j + size*i
+        arr[index].value = curNum++
+
+        --i; ++j;
+        if (i < 0) {
+          i = size-1
+        }
+        if (j >= size) {
+          j = 0
+        }
+      }
+      // each time it completes M numbers, move 2 cells right
+      j += 1
+      ++i // revert i
+      if (i >= size) {
+        i = 0
+      }
+      if (j >= size) {
+        j = 0 + (j - size)
+      }
+    }
+  }
+
+  brumgnachStracheySquares(curNum:number, arr:{value:number}[]) {
+    // first do gamma plus two for A B C and D
+    const N:number = this.state.size/2;
+
+    const getSquareAB = (arr:{value:number}[], first:number) => {
+      const newArr = Array(N*N).fill({});
+
+      let i_real = first;
+
+      for (let i = 0; i<N; i++) {
+        for (let j = 0; j<N; j++) {
+          const index = j + N*i;
+          const index_real = j + this.state.size*i_real;
+
+          newArr[index] = arr[index_real+first];
+        }
+        i_real += 1;
       }
 
-    // eslint-disable-next-line
-    } else if ((this.state.size % 2 == 0) && (this.state.size % 4 != 0)) { // singly even
-      // Brumgnach-Strachey method
+      return newArr;
+    };
 
+    const getSquareC = (arr:{value:number}[], first:number) => {
+      const newArr = Array(N*N).fill({});
 
+      let i_real = first-(N*2);
 
-    } else { // odd
-      // gamma plus two
-      // start one right of the centre
-      var i = Math.floor(this.state.size /2) // row
-      var j = Math.floor(this.state.size /2) + 1// col
-      for (let num = 0; num < this.state.size; num++) {
-        for (let m = 0; m < this.state.size; m++) {
-          let index = j + this.state.size*i
-          //console.log(curNum + ": " + i + ", " + j)
-          arr[index] = curNum++
+      for (let i = 0; i<N; i++) {
+        for (let j = 0; j<N; j++) {
+          const index = j + N*i;
+          const index_real = (j + this.state.size*i_real) + (N);
 
-          --i; ++j;
-          if (i < 0) {
-            i = this.state.size-1
-          }
-          if (j >= this.state.size) {
-            j = 0
-          }
+          newArr[index] = arr[index_real];
         }
-        // each time it completes M numbers, move 2 cells right
-        j += 1
-        ++i // revert i
-        if (i >= this.state.size) {
-          i = 0
+        i_real += 1;
+      }
+
+      return newArr;
+    };
+
+    const getSquareD = (arr:{value:number}[], first:number) => {
+      const newArr = Array(N*N).fill({});
+
+      let i_real = first/N;
+
+      for (let i = 0; i<N; i++) {
+        for (let j = 0; j<N; j++) {
+          const index = j + N*i;
+          const index_real = (j + this.state.size*i_real);
+
+          newArr[index] = arr[index_real];
         }
-        if (j >= this.state.size) {
-          j = 0 + (j - this.state.size)
+        i_real += 1;
+      }
+
+      return newArr;
+    };
+
+    // initial A B C D setup
+    const A = getSquareAB(arr, 0*N);
+    const B = getSquareAB(arr, 1*N);
+    const C = getSquareC(arr, 2*N);
+    const D = getSquareD(arr, N*N);
+
+    // fill in sub matrices
+    this.gammaPlusTwoSquares(curNum, A, N); // A
+    curNum += (N*N);
+    this.gammaPlusTwoSquares(curNum, B, N); // B
+    curNum += (N*N);
+    this.gammaPlusTwoSquares(curNum, C, N); // C
+    curNum += (N*N);
+    this.gammaPlusTwoSquares(curNum, D, N); // D
+
+    // Swapping, using the swap by columns method : I am not equiped to adequetly explain these, refer to the paper
+    // Swap between A & D
+    // swap all cells in the left most column except middle
+
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const index = j + (N*i);
+        if (j === 0) {
+          if (i === ((N+1)/2)-1) {
+            continue;
+          }
+          const bottom = D[index].value;
+
+          D[index].value = A[index].value;
+          A[index].value = bottom;
+
+        } else if ((this.state.size+2)/4 === (j+1)) {
+          if (i === ((N+1)/2)-1) { // swap only middle cell
+            const bottom = D[index].value;
+
+            D[index].value = A[index].value;
+            A[index].value = bottom;
+          }
         }
       }
     }
 
-    /*for (let i = 0; i < this.state.size; i++) {
-      for (let j = 0; j < this.state.size; j++) {
-        let index = j + this.state.size*i
+    // Swap between C + B
+    const start:number = (this.state.size - 6) / 4;
+    if (start === 0) return;
+    for (let col = 1; col <= start; col++) {
+      const col_i = N - col; // get rightmost x col
 
+      for (let j = 0; j<N; j++) {
+        const index = col_i + (N*j);
+        const bottom = C[index].value;
+        console.log(index)
+
+        C[index].value = B[index].value;
+        B[index].value = bottom;
       }
-    } */
+    }
+
+  }
+
+  makeMagic() {
+    // compute magic squares array
+    var curNum: number = 1
+    var arr            = Array(this.state.size*this.state.size).fill({}).map((el:any) => ({value: 0}))
+
+    if ((this.state.size % 2 === 0) && (this.state.size % 4 === 0)) { // doubly even
+      // Durer method
+      this.durerSquares(curNum, arr);
+
+  } else if ((this.state.size % 2 === 0) && (this.state.size % 4 !== 0)) { // singly even
+      // Brumgnach-Strachey method
+      this.brumgnachStracheySquares(curNum, arr);
+
+    } else { // odd
+      // gamma plus two
+      this.gammaPlusTwoSquares(curNum, arr, this.state.size);
+    }
 
     this.setState({
       squares: arr
@@ -155,14 +271,14 @@ class Board extends React.Component<{size: number}, {size:number, squares: Array
   render() {
     let content: Array<any> = []
 
-    content.push(<div>{"Magic Sum:" + ((this.state.size*(this.state.size*this.state.size+1))/2) } </div>)
+    content.push(<div key="sum" style={{marginBottom:"5px"}}>{"Magic Sum: " + ((this.state.size*(this.state.size*this.state.size+1))/2) } </div>)
 
     for (let i = 0; i < this.state.size; i++) {
       let row: Array<any> = []
       for (let j = 0; j < this.state.size; j++) {
-        row.push(<div>{this.renderSquare(this.state.squares[j + this.state.size*i])}</div>)
+        row.push(<div key={"col-" + i + "-" + j}>{this.renderSquare(this.state.squares[j + this.state.size*i].value)}</div>)
       }
-      content.push(<div className="row">{row}</div>)
+      content.push(<div key={"row-"+i} className="row">{row}</div>)
     }
 
     return (
@@ -177,9 +293,8 @@ class Manager extends React.Component<{}, {size: number}> {
   constructor(props: any) {
     super(props)
     this.state = {
-      size: 4,// default magic square size
-    }
-    this.setState({size: 4}, this.render)
+      size: 10,// default magic square size
+    };
   }
 
   handleChange(evt: any) {
